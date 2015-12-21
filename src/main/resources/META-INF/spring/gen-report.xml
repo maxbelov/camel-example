@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+
+    <bean id="reportGenerator" class="com.vk.javann.ReportGenerator"/>
+
+    <camelContext xmlns="http://camel.apache.org/schema/spring">
+        <propertyPlaceholder id="props" location="com/vk/javann/app.properties"/>
+
+        <route id="reportGenerator">
+            <from uri="timer://generateReport?period={{report.generator.period}}"/>
+                <process ref="reportGenerator"/>
+                <log message="Generated report with ${body.getTickets().size()} tickets"/>
+                <to uri="file://{{report.generator.out.folder}}?fileName=report-${date:now:yyyyMMdd-HHmmss}.xml"/>
+        </route>
+    </camelContext>
+
+</beans>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+
+    <jdbc:embedded-database id="accountDs" type="H2">
+        <jdbc:script location="classpath:com/vk/javann/db/create-account-db.sql"/>
+    </jdbc:embedded-database>
+
+    <camelContext xmlns="http://camel.apache.org/schema/spring">
+        <dataFormats>
+            <json id="json" library="Jackson"/>
+        </dataFormats>
+
+        <restConfiguration host="localhost" port="9090" component="restlet"/>
+
+        <rest path="/account" bindingMode="json">
+            <get uri="/employee/{accountNumber}">
+                <route>
+                    <to uri="direct:getEmployee"/>
+                </route>
+            </get>
+        </rest>
+
+        <route id="getEmployee">
+            <from uri="direct:getEmployee"/>
+                <to uri="sql://select firstname, lastname from employee e inner join account a on e.account_id = a.id where a.account_number = :#accountNumber?dataSource=accountDs&amp;OutputType=SelectOne"/>
+                <log message="Account ${header.accountNumber} employee: ${body}"/>
+        </route>
+
+    </camelContext>
+
+</beans>

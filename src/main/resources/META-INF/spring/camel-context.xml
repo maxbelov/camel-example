@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+
+    <bean id="sumAmountStrategy" class="com.vk.javann.PaymentAggregationStrategy"/>
+
+    <jdbc:embedded-database id="paymentDs" type="H2">
+        <jdbc:script location="classpath:com/vk/javann/db/create-payment-db.sql"/>
+    </jdbc:embedded-database>
+
+    <camelContext xmlns="http://camel.apache.org/schema/spring">
+        <dataFormats>
+            <jaxb id="reportFormat" prettyPrint="true" contextPath="com.vk.javann.data"/>
+            <json id="json" library="Jackson" prettyPrint="true"/>
+        </dataFormats>
+
+        <route>
+            <from uri="file:src/data?noop=true"/>
+            <unmarshal ref="reportFormat"/>
+            <setHeader headerName="date">
+                <simple>${body.date}</simple>
+            </setHeader>
+            <transform>
+                <simple>${body.getTickets()}</simple>
+            </transform>
+            <split>
+                <simple>${body}</simple>
+                <log message="${body}"/>
+                <to uri="direct:fillMessage"/>
+                <multicast>
+                    <to uri="direct:persist"/>
+                    <to uri="direct:mail"/>
+                </multicast>
+            </split>
+        </route>
+
+        <route id="persist">
+            <from uri="direct:persist"/>
+                <to uri="sql://insert into payment(amount, expense_item, account_number, firstname, lastname) values(:#amount, :#expenseItem, :#accountNumber, :#firstname, :#lastname)?dataSource=paymentDs"/>
+                    <log message="Inserted rows: ${header.CamelSqlUpdateCount}"/>
+        </route>
+
+        <route id="mail">
+            <from uri="direct:mail"/>
+            <aggregate strategyRef="sumAmountStrategy" completionTimeout="5000">
+                <correlationExpression>
+                    <simple>header.accountNumber</simple>
+                </correlationExpression>
+                <log message="Payments amount for account ${header.accountNumber}: ${header.amount}"/>
+                <transform>
+                    <simple>${header.accountNumber} - ${header.amount}</simple>
+                </transform>
+                <to uri="smtp://localhost:25?subject=Payment report&amp;to=report@mail.com"/>
+            </aggregate>
+        </route>
+
+        <route id="fillMessage">
+            <from uri="direct:fillMessage"/>
+                <setHeader headerName="amount">
+                    <simple>${body.amount}</simple>
+                </setHeader>
+                <setHeader headerName="accountNumber">
+                    <simple>${body.accountNumber}</simple>
+                </setHeader>
+                <setHeader headerName="expenseItem">
+                    <simple>${body.expenseItem}</simple>
+                </setHeader>
+
+                <to uri="restlet://http://localhost:9090/account/employee/{accountNumber}"/>
+                <unmarshal ref="json"/>
+
+                <setHeader headerName="firstname">
+                    <simple>${body[FIRSTNAME]}</simple>
+                </setHeader>
+                <setHeader headerName="lastname">
+                    <simple>${body[LASTNAME]}</simple>
+                </setHeader>
+                <setBody>
+                    <simple>null</simple>
+                </setBody>
+        </route>
+    </camelContext>
+</beans>

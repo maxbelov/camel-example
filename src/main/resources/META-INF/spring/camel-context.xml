@@ -21,8 +21,23 @@
             <json id="json" library="Jackson" prettyPrint="true"/>
         </dataFormats>
 
+        <restConfiguration host="{{payment.service.host}}" port="{{payment.service.port}}" component="restlet"/>
+        <rest path="/payment" bindingMode="json">
+            <get uri="/all">
+                <route id="paymentAll">
+                    <to uri="sql://select * from payment?dataSource=paymentDs"/>
+                </route>
+            </get>
+            <get uri="/byaccount">
+                <route id="byAccount">
+                    <to uri="sql://select sum(amount) as sum, account_number from payment group by account_number?dataSource=paymentDs"/>
+                </route>
+            </get>
+        </rest>
+
+
         <route>
-            <from uri="file:src/data?noop=true"/>
+            <from uri="file:{{report.in.folder}}?noop=true"/>
             <unmarshal ref="reportFormat"/>
             <setHeader headerName="date">
                 <simple>${body.date}</simple>

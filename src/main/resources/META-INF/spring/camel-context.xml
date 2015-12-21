@@ -14,6 +14,8 @@
     </jdbc:embedded-database>
 
     <camelContext xmlns="http://camel.apache.org/schema/spring">
+        <propertyPlaceholder id="props" location="com/vk/javann/app.properties"/>
+
         <dataFormats>
             <jaxb id="reportFormat" prettyPrint="true" contextPath="com.vk.javann.data"/>
             <json id="json" library="Jackson" prettyPrint="true"/>
@@ -47,16 +49,21 @@
 
         <route id="mail">
             <from uri="direct:mail"/>
-            <aggregate strategyRef="sumAmountStrategy" completionTimeout="5000">
-                <correlationExpression>
-                    <simple>header.accountNumber</simple>
-                </correlationExpression>
-                <log message="Payments amount for account ${header.accountNumber}: ${header.amount}"/>
-                <transform>
-                    <simple>${header.accountNumber} - ${header.amount}</simple>
-                </transform>
-                <to uri="smtp://localhost:25?subject=Payment report&amp;to=report@mail.com"/>
-            </aggregate>
+            <choice>
+                <when>
+                    <simple>{{mail.use}}</simple>
+                    <aggregate strategyRef="sumAmountStrategy" completionTimeout="5000">
+                        <correlationExpression>
+                            <simple>header.accountNumber</simple>
+                        </correlationExpression>
+                        <log message="Payments amount for account ${header.accountNumber}: ${header.amount}"/>
+                        <transform>
+                            <simple>${header.accountNumber} - ${header.amount}</simple>
+                        </transform>
+                        <to uri="{{mail.uri}}?subject={{mail.subject}}&amp;to={{mail.to}}&amp;={{mail.from}}"/>
+                    </aggregate>
+                </when>
+            </choice>
         </route>
 
         <route id="fillMessage">
@@ -71,7 +78,7 @@
                     <simple>${body.expenseItem}</simple>
                 </setHeader>
 
-                <to uri="restlet://http://localhost:9090/account/employee/{accountNumber}"/>
+                <to uri="restlet://http://{{account.service.host}}:{{account.service.port}}/account/employee/{accountNumber}"/>
                 <unmarshal ref="json"/>
 
                 <setHeader headerName="firstname">

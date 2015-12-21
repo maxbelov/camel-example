@@ -12,11 +12,13 @@
     </jdbc:embedded-database>
 
     <camelContext xmlns="http://camel.apache.org/schema/spring">
+        <propertyPlaceholder id="props" location="com/vk/javann/app.properties"/>
+
         <dataFormats>
             <json id="json" library="Jackson"/>
         </dataFormats>
 
-        <restConfiguration host="localhost" port="9090" component="restlet"/>
+        <restConfiguration host="{{account.service.host}}" port="{{account.service.port}}" component="restlet"/>
 
         <rest path="/account" bindingMode="json">
             <get uri="/employee/{accountNumber}">
